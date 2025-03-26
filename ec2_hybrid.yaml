@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: |
+  Hybrid template to create EC2 + EIP only in AWS deployments.
+  In LocalStack (local), skips EC2 + EIP to avoid Pro-only features.
+
+Parameters:
+  DeploymentType:
+    Type: String
+    Default: local
+    AllowedValues:
+      - local
+      - aws
+    Description: "Controls whether to create real AWS resources or skip them locally."
+
+  ImageId:
+    Type: String
+    Default: "ami-12345678"
+    Description: "AMI ID for the EC2 instance (ignored in local mode)."
+
+Conditions:
+  IsLocal: !Equals [ !Ref DeploymentType, "local" ]
+  IsAws: !Equals [ !Ref DeploymentType, "aws" ]
+
+Resources:
+  # ----------------------------------------------------
+  # Example Resource(s) always created
+  # (S3, DynamoDB, etc. can be tested in LocalStack)
+  # ----------------------------------------------------
+  ExampleBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "my-example-bucket-${AWS::StackName}"
+
+  # ----------------------------------------------------
+  # EC2 + EIP: only created in AWS
+  # ----------------------------------------------------
+  MyEC2Instance:
+    Condition: IsAws
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.medium
+      ImageId: !Ref ImageId
+
+  MyEIP:
+    Condition: IsAws
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref MyEC2Instance
+
+Outputs:
+  # Always outputs the bucket name
+  BucketName:
+    Description: "Name of the created S3 bucket."
+    Value: !Ref ExampleBucket
+
+  # Only valid if you actually create EC2
+  InstanceId:
+    Condition: IsAws
+    Description: "EC2 Instance ID"
+    Value: !Ref MyEC2Instance
+
+  EIPAllocation:
+    Condition: IsAws
+    Description: "Elastic IP reference"
+    Value: !Ref MyEIP
